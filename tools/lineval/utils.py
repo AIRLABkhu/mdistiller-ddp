@@ -82,7 +82,7 @@ def init_parser(
 ) -> ArgumentParser:
     # experiment
     parser.add_argument('expname', type=str)
-    parser.add_argument('--tag', '-t', type=T_CHECKPOINT_TAG, default='best')
+    parser.add_argument('--tag', '-t', type=T_CHECKPOINT_TAG, default='latest')
     parser.add_argument('--device', '-d', type=int, default=0)
     # dataloader
     parser.add_argument('--batch-size', '-bs', type=int, default=512)
