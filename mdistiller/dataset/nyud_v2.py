@@ -33,12 +33,6 @@ def denormalize(x: torch.Tensor):
 def get_nyud_train_transform(mean=MEAN, std=STD, img_size: int=224):
     resizing_size = int(img_size * (256 / 224))
     return A.Compose([
-        A.SmallestMaxSize(max_size=resizing_size),
-        A.RandomResizedCrop(
-            size=(img_size, img_size),
-            scale=(0.8, 1.0), 
-            ratio=(1.0, 1.0), 
-            p=1.0),
         A.HorizontalFlip(p=0.5),
         A.ColorJitter(
             brightness=0.2, 
@@ -54,8 +48,6 @@ def get_nyud_train_transform(mean=MEAN, std=STD, img_size: int=224):
 def get_nyud_test_transform(mean=MEAN, std=STD, img_size: int=224):
     resizing_size = int(img_size * (256 / 224))
     return A.Compose([
-        A.SmallestMaxSize(max_size=resizing_size),
-        A.CenterCrop(height=img_size, width=img_size),
         A.Normalize(mean=mean, std=std),
         ToTensorV2(),
     ], additional_targets={'depth': 'image'})

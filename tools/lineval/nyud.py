@@ -1,11 +1,15 @@
 from argparse import ArgumentParser
 from tqdm.auto import tqdm
+import numpy as np
 
 import einops
 
 import torch
 from torch import optim
 from torch.optim import lr_scheduler
+from torchvision.transforms.functional import (
+    resize, center_crop
+)
 
 from mdistiller.dataset.nyud_v2 import get_nyud_dataloaders
 from mdistiller.models._base import ModelBase
@@ -52,6 +56,20 @@ if __name__ == '__main__':
     )
     
     # Utility
+    def crop_resize(x: torch.Tensor, size: int, random_crop: bool=False):
+        shorter = min(x.shape[-2:])
+        x_cropped = center_crop(x, shorter)
+        if random_crop:
+            crop_size = int(shorter * 0.8)
+            low = np.random.randint(0, shorter - crop_size - 1, size=(2,))
+            high = low + crop_size
+            x_cropped = x[..., low[0]:high[0], low[1]:high[1]]
+        x_resized = resize(x_cropped, (size, size))
+        return x_resized
+
+    def restore_depth_map(x: torch.Tensor, size: tuple[int, int]):
+        return resize(x, size)
+
     def patches_to_depth(x: torch.Tensor):
         _, num_patches, embed_dim = x.shape
         patch_rows = int(num_patches**0.5)
@@ -71,11 +89,13 @@ if __name__ == '__main__':
         with tqdm(train_loader, desc=f'TRAIN {epoch+1}', dynamic_ncols=True) as bar:
             total_loss, total_rmse, total = 0, 0, 0
             for input, target in bar:
+                input = crop_resize(input, size=224, random_crop=True)
                 with torch.no_grad():
                     x = model.forward_stem(input.cuda(DEVICE))
                     x = model.get_layers().forward(x)
                 pred_patches = head.forward(x)
                 pred = patches_to_depth(pred_patches)
+                pred = restore_depth_map(pred, target.shape[-2:])
                 
                 loss = torch.nn.functional.mse_loss(pred, target.to(DEVICE))
                 loss.backward()
@@ -99,10 +119,12 @@ if __name__ == '__main__':
         with tqdm(test_loader, desc=f' TEST {epoch+1}', dynamic_ncols=True) as bar, torch.no_grad():
             total_loss, total = 0, 0
             for input, target in bar:
+                input = crop_resize(input, size=224, random_crop=False)
                 x = model.forward_stem(input.cuda(DEVICE))
                 x = model.get_layers().forward(x)
                 pred_patches = head.forward(x)
                 pred = patches_to_depth(pred_patches)
+                pred = restore_depth_map(pred, target.shape[-2:])
                 loss = torch.nn.functional.mse_loss(pred, target.to(DEVICE))
                 
                 batch_size = input.size(0)
